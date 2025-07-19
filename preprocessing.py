@@ -2,20 +2,20 @@ import torch
 import pandas as pd
 import re
 import string
-from collections import Counter
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 from transformers import AutoTokenizer
 
+english_tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+german_tokenizer = AutoTokenizer.from_pretrained("dbmdz/bert-base-german-cased")
 
-english_tokenizer=AutoTokenizer.from_pretrained("bert-base-uncased")
-german_tokenizer=AutoTokenizer.from_pretrained("dbmdz/bert-base-german-cased")
 def clean_text(text):
     text = text.lower()
     text = re.sub(r'\d+', '', text)
     text = re.sub(f"[{re.escape(string.punctuation)}]", "", text)
     text = re.sub(r'\W+', ' ', text)
     return text.strip()
+
 def tokenize_en(text):
     return english_tokenizer.encode(text, add_special_tokens=True, truncation=True, max_length=128)
 
@@ -24,27 +24,11 @@ def tokenize_ger(text):
 
 def load_and_preprocess(file_path):
     df = pd.read_csv(file_path, sep='\t')
-    df = df.iloc[:,[1, 3]]
+    df = df.iloc[:, [1, 3]]
     df.columns = ['en', 'ger']
     df['en'] = df['en'].apply(clean_text)
     df['ger'] = df['ger'].apply(clean_text)
     return df
-
-def add_special_tokens(sentences):
-    return [['<sos>'] + sentence + ['<eos>'] for sentence in sentences]
-
-def build_vocab(tokenized_sentences, min_freq=2):
-    counter = Counter()
-    for sentence in tokenized_sentences:
-        counter.update(sentence)
-    vocab = ['<pad>', '<unk>', '<sos>', '<eos>']
-    vocab += [word for word, freq in counter.items() if freq >= min_freq]
-    word2idx = {word: idx for idx, word in enumerate(vocab)}
-    idx2word = {idx: word for word, idx in word2idx.items()}
-    return word2idx, idx2word
-
-def numericalize(sentences, word2idx):
-    return [[word2idx.get(token, word2idx['<unk>']) for token in sentence] for sentence in sentences]
 
 class TranslationDataset(Dataset):
     def __init__(self, src_sequences, trg_sequences):
