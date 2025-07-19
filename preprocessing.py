@@ -1,27 +1,27 @@
 import torch
 import pandas as pd
-import spacy
 import re
 import string
 from collections import Counter
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
+from transformers import AutoTokenizer
 
-spacy_en = spacy.load("en_core_web_sm")
-spacy_de = spacy.load("de_core_news_sm")
 
+english_tokenizer=AutoTokenizer.from_pretrained("bert-base-uncased")
+german_tokenizer=AutoTokenizer.from_pretrained("dbmdz/bert-base-german-cased")
 def clean_text(text):
     text = text.lower()
     text = re.sub(r'\d+', '', text)
     text = re.sub(f"[{re.escape(string.punctuation)}]", "", text)
-    text = re.sub(r'\W', ' ', text)
+    text = re.sub(r'\W+', ' ', text)
     return text.strip()
 
 def tokenize_en(text):
-    return [tok.text.lower() for tok in spacy_en(text)]
+    return english_tokenizer.tokenize(text)
 
 def tokenize_ger(text):
-    return [tok.text.lower() for tok in spacy_de(text)]
+    return german_tokenizer.tokenize(text)
 
 def load_and_preprocess(file_path):
     df = pd.read_csv(file_path, sep='\t')
