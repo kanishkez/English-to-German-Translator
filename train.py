@@ -3,47 +3,37 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from translator import Encoder, Decoder, Seq2Seq
-from preprocessing import (load_and_preprocess, tokenize_en, tokenize_ger,
-                           add_special_tokens, build_vocab, numericalize,
-                           TranslationDataset, collate_fn)
+from preprocessing import load_and_preprocess, tokenize_en, tokenize_ger, TranslationDataset, collate_fn
+from transformers import AutoTokenizer
+from tqdm import tqdm
+import os
 
+os.makedirs("models", exist_ok=True)
+
+english_tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+german_tokenizer = AutoTokenizer.from_pretrained("dbmdz/bert-base-german-cased")
 
 file_path = "translator/data/Sentence pairs in English-German - 2025-07-14.tsv"
-
-
 df = load_and_preprocess(file_path)
-tokenized_en = [tokenize_en(sent) for sent in df['en']]
-tokenized_ger = [tokenize_ger(sent) for sent in df['ger']]
-tokenized_en = add_special_tokens(tokenized_en)
-tokenized_ger = add_special_tokens(tokenized_ger)
 
+tokenized_en = [tokenize_en(sent) for sent in tqdm(df['en'], desc="Tokenizing English")]
+tokenized_ger = [tokenize_ger(sent) for sent in tqdm(df['ger'], desc="Tokenizing German")]
 
-en_word2idx, en_idx2word = build_vocab(tokenized_en)
-de_word2idx, de_idx2word = build_vocab(tokenized_ger)
+pad_idx = german_tokenizer.pad_token_id
+train_dataset = TranslationDataset(tokenized_en, tokenized_ger)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=lambda batch: collate_fn(batch, pad_idx))
 
-
-numerical_en = numericalize(tokenized_en, en_word2idx)
-numerical_ger = numericalize(tokenized_ger, de_word2idx)
-
-
-pad_idx = de_word2idx['<pad>']
-train_dataset = TranslationDataset(numerical_en, numerical_ger)
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True,
-                          collate_fn=lambda batch: collate_fn(batch, pad_idx))
-
-
-INPUT_DIM = len(en_word2idx)
-OUTPUT_DIM = len(de_word2idx)
+INPUT_DIM = english_tokenizer.vocab_size
+OUTPUT_DIM = german_tokenizer.vocab_size
 EMB_DIM = 256
 HID_DIM = 512
 NUM_LAYERS = 2
 DROPOUT = 0.5
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 enc = Encoder(INPUT_DIM, EMB_DIM, HID_DIM, NUM_LAYERS, DROPOUT)
 dec = Decoder(OUTPUT_DIM, EMB_DIM, HID_DIM, NUM_LAYERS, DROPOUT)
-model = Seq2Seq(enc, dec, DEVICE).to(DEVICE)
-
+model = Seq2Seq(enc, dec, device).to(device)
 
 optimizer = optim.Adam(model.parameters())
 criterion = nn.CrossEntropyLoss(ignore_index=pad_idx)
@@ -65,6 +55,6 @@ def train(model, loader, optimizer, criterion, device):
     return epoch_loss / len(loader)
 
 for epoch in range(1, 11):
-    loss = train(model, train_loader, optimizer, criterion, DEVICE)
+    loss = train(model, train_loader, optimizer, criterion, device)
     print(f"Epoch {epoch}, Loss: {loss:.4f}")
     torch.save(model.state_dict(), f"models/seq2seq_epoch_{epoch}.pt")
