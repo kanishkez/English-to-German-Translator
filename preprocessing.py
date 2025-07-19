@@ -16,12 +16,11 @@ def clean_text(text):
     text = re.sub(f"[{re.escape(string.punctuation)}]", "", text)
     text = re.sub(r'\W+', ' ', text)
     return text.strip()
-
 def tokenize_en(text):
-    return english_tokenizer.tokenize(text)
+    return english_tokenizer.encode(text, add_special_tokens=True, truncation=True, max_length=128)
 
 def tokenize_ger(text):
-    return german_tokenizer.tokenize(text)
+    return german_tokenizer.encode(text, add_special_tokens=True, truncation=True, max_length=128)
 
 def load_and_preprocess(file_path):
     df = pd.read_csv(file_path, sep='\t')
