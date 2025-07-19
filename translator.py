@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
 import random
 
 class Encoder(nn.Module):
@@ -11,7 +10,7 @@ class Encoder(nn.Module):
 
     def forward(self, src):
         embedded = self.embedding(src)
-        outputs, (hidden, cell) =self.lstm(embedded)
+        outputs, (hidden, cell) = self.lstm(embedded)
         return hidden, cell
 
 class Decoder(nn.Module):
@@ -27,6 +26,7 @@ class Decoder(nn.Module):
         output, (hidden, cell) = self.lstm(embedded, (hidden, cell))
         prediction = self.fc_out(output.squeeze(1))
         return prediction, hidden, cell
+
 class Seq2Seq(nn.Module):
     def __init__(self, encoder, decoder, device):
         super().__init__()
